@@ -1,3 +1,4 @@
+from flask import current_app
 from http import HTTPStatus
 from typing import Iterable, Mapping, Union, Any
 
@@ -5,6 +6,7 @@ from flask_restful import Resource, fields, reqparse, marshal
 
 from metadata_service.exception import NotFoundException
 from metadata_service.proxy import get_proxy_client
+from metadata_service.proxy.search_proxy import SearchProxy
 
 
 user_fields = {
@@ -178,6 +180,7 @@ class TableTagAPI(Resource):
 
     def __init__(self) -> None:
         self.client = get_proxy_client()
+        self.search_client = SearchProxy(config=current_app.config)
         self.parser = reqparse.RequestParser()
         self.parser.add_argument('tag', type=str, location='json')
         super(TableTagAPI, self).__init__()
@@ -192,6 +195,8 @@ class TableTagAPI(Resource):
         """
         try:
             self.client.add_tag(table_uri=table_uri, tag=tag)
+            search_document = self.client.get_table_search_document(table_uri=table_uri)
+            self.search_client.update_elastic(table_uri=table_uri, data=search_document)
             return {'message': 'The tag {} for table_uri {} '
                                'is added successfully'.format(tag,
                                                               table_uri)}, HTTPStatus.OK
